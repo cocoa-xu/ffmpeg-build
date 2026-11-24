@@ -58,7 +58,10 @@ case "$variant" in
 esac
 case "$triplet" in
   *-apple-darwin)
-    flags+=(--install-name-dir=@rpath --extra-ldsoflags=-Wl,-rpath,@loader_path)
+    # Clang 16 made this an error; FFmpeg 4.0's aarch64 h264dsp declares int strides
+    # for assembly that sign-extends them anyway (4.1 only changed the prototypes).
+    flags+=(--install-name-dir=@rpath --extra-ldsoflags=-Wl,-rpath,@loader_path
+      --extra-cflags=-Wno-error=incompatible-function-pointer-types)
     if [ "$variant" = full ]; then
       # iconv lives in libiconv on macOS, not in libSystem.
       flags+=(--enable-videotoolbox --enable-audiotoolbox --extra-libs=-liconv --extra-ldexeflags=-Wl,-rpath,@executable_path/../lib)
