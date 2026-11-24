@@ -1,0 +1,77 @@
+name: 'Install FFmpeg'
+description: 'Download and set up a precompiled FFmpeg for the current runner from cocoa-xu/ffmpeg-build.'
+author: 'cocoa-xu'
+branding:
+  icon: 'film'
+  color: 'green'
+
+inputs:
+  ffmpeg_version:
+    description: >-
+      FFmpeg version or requirement. An exact version (e.g. "9.0.2") matches that
+      release exactly; an Elixir-style requirement resolves to the highest
+      available release that satisfies it: "~> 9.0" (any 9.x), ">= 8.0", "< 9", etc.
+    required: false
+  ffmpeg-version:
+    description: 'Alias for ffmpeg_version.'
+    required: false
+  variant:
+    description: >-
+      "full" for every component FFmpeg ships (LGPL only), or "skeleton" for the
+      headers and shared libraries without components, to link against at build time.
+    required: false
+    default: 'full'
+  triplet:
+    description: 'Override the detected platform triplet.'
+    required: false
+  install-dir:
+    description: 'Directory to extract FFmpeg into.'
+    required: false
+    default: '.ffmpeg'
+  add-to-path:
+    description: 'Append the bin directory of a full build to PATH (via GITHUB_PATH).'
+    required: false
+    default: 'true'
+  repository:
+    description: 'The ffmpeg-build repository to download releases from.'
+    required: false
+    default: 'cocoa-xu/ffmpeg-build'
+  token:
+    description: 'Token used to list releases when resolving a requirement (exact versions need no token).'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  ffmpeg-version:
+    description: 'The concrete FFmpeg version that was resolved and installed.'
+    value: ${{ steps.install.outputs.ffmpeg-version }}
+  install-dir:
+    description: 'Absolute path the archive was extracted to.'
+    value: ${{ steps.install.outputs.install-dir }}
+  pkg-config-path:
+    description: 'Directory with the .pc files, for PKG_CONFIG_PATH.'
+    value: ${{ steps.install.outputs.pkg-config-path }}
+  bindir:
+    description: 'Absolute path of the bin directory (empty for skeleton builds).'
+    value: ${{ steps.install.outputs.bindir }}
+  triplet:
+    description: 'The platform triplet (e.g. x86_64-linux-gnu).'
+    value: ${{ steps.install.outputs.triplet }}
+  variant:
+    description: 'The variant that was installed.'
+    value: ${{ steps.install.outputs.variant }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: install
+      shell: bash
+      run: bash "${{ github.action_path }}/install-ffmpeg.sh"
+      env:
+        INPUT_FFMPEG_VERSION: ${{ inputs.ffmpeg_version || inputs.ffmpeg-version }}
+        INPUT_VARIANT: ${{ inputs.variant }}
+        INPUT_TRIPLET: ${{ inputs.triplet }}
+        INPUT_INSTALL_DIR: ${{ inputs.install-dir }}
+        INPUT_ADD_TO_PATH: ${{ inputs.add-to-path }}
+        INPUT_REPOSITORY: ${{ inputs.repository }}
+        INPUT_TOKEN: ${{ inputs.token }}
