@@ -63,7 +63,7 @@ jobs:
           .ffmpeg/bin/ffmpeg -hide_banner -version | head -n 1
 
   test-container:
-    # Runs the published action the way container jobs consume it.
+    # Container jobs only see the action through GITHUB_ACTION_PATH.
     name: ubuntu:24.04 container (full ~> 9.0)
     runs-on: ubuntu-latest
     container: ubuntu:24.04
