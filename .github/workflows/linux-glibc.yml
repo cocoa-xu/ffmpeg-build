@@ -1,0 +1,83 @@
+name: linux-glibc
+
+on:
+  push:
+    tags:
+      - "v*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "FFmpeg version (X.Y or X.Y.Z)"
+        required: true
+      publish:
+        description: "Upload the builds to the release v<version>"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.job.target }} (${{ matrix.variant }})
+    runs-on: ${{ matrix.job.runs-on }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.version }}-${{ matrix.job.target }}-${{ matrix.variant }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - { target: x86_64-linux-gnu, runs-on: ubuntu-latest }
+          - { target: aarch64-linux-gnu, runs-on: ubuntu-24.04-arm }
+        variant: [full, skeleton]
+
+    steps:
+      - name: Resolve the FFmpeg version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${INPUT_VERSION#v}"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+
+      # glibc 2.31, so the libraries load on any distribution released since 2020.
+      - name: Build in ubuntu:20.04
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work ubuntu:20.04 bash -c '
+            set -e
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -q
+            apt-get install -y --no-install-recommends build-essential pkg-config curl ca-certificates xz-utils patchelf nasm zlib1g-dev
+            bash .github/build-ffmpeg.sh "$0" "$1" "$2" build
+          ' "${{ steps.version.outputs.version }}" "${{ matrix.variant }}" "${{ matrix.job.target }}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ffmpeg-${{ steps.version.outputs.version }}-${{ matrix.job.target }}-${{ matrix.variant }}
+          path: |
+            build/*.tar.gz
+            build/*.sha256
+
+      - uses: softprops/action-gh-release@v3
+        if: github.event_name == 'push' || inputs.publish
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: |
+            build/*.tar.gz
+            build/*.sha256
+
+      # FFmpeg is LGPL: every release also carries the exact source it was built from.
+      - uses: softprops/action-gh-release@v3
+        if: (github.event_name == 'push' || inputs.publish) && matrix.job.target == 'x86_64-linux-gnu' && matrix.variant == 'full'
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: build/ffmpeg-${{ steps.version.outputs.version }}.tar.xz

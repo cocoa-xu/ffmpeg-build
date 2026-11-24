@@ -1,0 +1,73 @@
+name: linux-musl
+
+on:
+  push:
+    tags:
+      - "v*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "FFmpeg version (X.Y or X.Y.Z)"
+        required: true
+      publish:
+        description: "Upload the builds to the release v<version>"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.job.target }} (${{ matrix.variant }})
+    runs-on: ${{ matrix.job.runs-on }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.version }}-${{ matrix.job.target }}-${{ matrix.variant }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - { target: x86_64-linux-musl, runs-on: ubuntu-latest }
+          - { target: aarch64-linux-musl, runs-on: ubuntu-24.04-arm }
+        variant: [full, skeleton]
+
+    steps:
+      - name: Resolve the FFmpeg version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${INPUT_VERSION#v}"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+
+      # musl 1.2.4; binaries built against an older musl keep working on newer ones.
+      - name: Build in alpine:3.18
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work alpine:3.18.12 sh -c '
+            set -e
+            apk add --no-cache bash build-base linux-headers pkgconf curl xz patchelf nasm zlib-dev
+            bash .github/build-ffmpeg.sh "$0" "$1" "$2" build
+          ' "${{ steps.version.outputs.version }}" "${{ matrix.variant }}" "${{ matrix.job.target }}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ffmpeg-${{ steps.version.outputs.version }}-${{ matrix.job.target }}-${{ matrix.variant }}
+          path: |
+            build/*.tar.gz
+            build/*.sha256
+
+      - uses: softprops/action-gh-release@v3
+        if: github.event_name == 'push' || inputs.publish
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: |
+            build/*.tar.gz
+            build/*.sha256
