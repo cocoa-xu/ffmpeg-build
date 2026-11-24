@@ -61,3 +61,23 @@ jobs:
         run: |
           PKG_CONFIG_PATH="$PWD/.ffmpeg/lib/pkgconfig" pkg-config --modversion libavcodec
           .ffmpeg/bin/ffmpeg -hide_banner -version | head -n 1
+
+  test-container:
+    # Runs the published action the way container jobs consume it.
+    name: ubuntu:24.04 container (full ~> 9.0)
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04
+    steps:
+      - run: apt-get update -q && apt-get install -y --no-install-recommends curl ca-certificates pkg-config
+      - uses: actions/checkout@v7
+      - name: Install FFmpeg
+        id: ffmpeg
+        uses: ./
+        with:
+          ffmpeg_version: '~> 9.0'
+      - name: Verify
+        env:
+          PKG_CONFIG_PATH: ${{ steps.ffmpeg.outputs.pkg-config-path }}
+        run: |
+          pkg-config --modversion libavcodec
+          ffmpeg -hide_banner -version | head -n 1

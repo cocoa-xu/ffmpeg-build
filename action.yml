@@ -66,7 +66,8 @@ runs:
   steps:
     - id: install
       shell: bash
-      run: bash "${{ github.action_path }}/install-ffmpeg.sh"
+      # github.action_path is the host path; GITHUB_ACTION_PATH is mapped into container jobs.
+      run: bash "$GITHUB_ACTION_PATH/install-ffmpeg.sh"
       env:
         INPUT_FFMPEG_VERSION: ${{ inputs.ffmpeg_version || inputs.ffmpeg-version }}
         INPUT_VARIANT: ${{ inputs.variant }}
