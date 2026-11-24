@@ -54,7 +54,8 @@ jobs:
             set -e
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -q
-            apt-get install -y --no-install-recommends build-essential pkg-config curl ca-certificates xz-utils patchelf nasm zlib1g-dev
+            apt-get install -y --no-install-recommends build-essential pkg-config curl ca-certificates xz-utils patchelf zlib1g-dev
+            if [ "$1" = full ] && [ "$(uname -m)" = x86_64 ]; then bash .github/install-nasm.sh; fi
             bash .github/build-ffmpeg.sh "$0" "$1" "$2" build
           ' "${{ steps.version.outputs.version }}" "${{ matrix.variant }}" "${{ matrix.job.target }}"
 
